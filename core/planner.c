@@ -352,6 +352,30 @@ struct divedatapoint *create_dp(int time_incr, int depth, int cylinderid, int po
 	return dp;
 }
 
+// auto CCR setpoint increases during decompression
+static void set_auto_deco_setpoints(struct diveplan *diveplan)
+{
+	struct divedatapoint **dp = &diveplan->dp; // the array of divedatapoint
+	depth_t const d1 = {21000}; // depth_t is a struct with a sole member 'mm' <int>
+	depth_t const d2 = {6000};
+	int previous_depth = 1e9; // mind previous depth to avoid premature increase during ascents
+	while (*dp){
+//		printf("time %i, depth %i; setpoint %i",(*dp)->time,(*dp)->depth.mm,(*dp)->setpoint);
+		if((*dp)->divemode == CCR){
+			if((*dp)->depth.mm <= d1.mm && previous_depth <= d1.mm){
+				(*dp)->setpoint = 1400;
+			}
+			if((*dp)->depth.mm <= d2.mm && previous_depth <= d2.mm){
+				(*dp)->setpoint = 1600;
+			}
+//			printf(" ** CCR auto setpoint %i",(*dp)->setpoint);
+		}
+//		printf("\n");
+		previous_depth = (*dp)->depth.mm;
+		dp = &(*dp)->next;
+	}
+}
+
 static void add_to_end_of_diveplan(struct diveplan *diveplan, struct divedatapoint *dp)
 {
 	struct divedatapoint **lastdp = &diveplan->dp;
@@ -373,6 +397,7 @@ struct divedatapoint *plan_add_segment(struct diveplan *diveplan, int duration, 
 	struct divedatapoint *dp = create_dp(duration, depth, cylinderid, divemode == CCR ? po2 : 0);
 	dp->entered = entered;
 	dp->divemode = divemode;
+//	if(divemode == CCR) dp->setpoint = po2;
 	add_to_end_of_diveplan(diveplan, dp);
 	return dp;
 }
@@ -1088,6 +1113,11 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 		current_cylinder = dive->cylinders.nr;
 		plan_add_segment(diveplan, prefs.surface_segment, 0, current_cylinder, 0, false, OC);
 	}
+
+	// auto CCR setpoint increases during decompression
+	// update applicable diveplan divedatapoint.setpoint(s)
+	if(divemode == CCR && !prefs.dobailout) set_auto_deco_setpoints(diveplan);
+
 	create_dive_from_plan(diveplan, dive, is_planner);
 	add_plan_to_notes(diveplan, dive, show_disclaimer, error);
 	fixup_dc_duration(&dive->dc);
