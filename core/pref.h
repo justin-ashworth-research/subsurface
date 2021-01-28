@@ -199,6 +199,7 @@ struct preferences {
 	bool                        show_average_depth;
 	bool                        show_ccr_sensors;
 	bool                        show_ccr_setpoint;
+	bool                        auto_ccr_setpoint_deco;
 	bool                        show_icd;
 	bool                        show_pictures_in_profile;
 	bool                        show_sac;

@@ -361,6 +361,7 @@ PlannerSettingsWidget::PlannerSettingsWidget(QWidget *parent) : QWidget(parent, 
 	PlannerShared::set_dobailout(false);
 	setBailoutVisibility(false);
 	ui.o2narcotic->setChecked(prefs.o2narcotic);
+	ui.auto_ccr_setpoint_deco->setChecked(prefs.auto_ccr_setpoint_deco);
 	ui.drop_stone_mode->setChecked(prefs.drop_stone_mode);
 	ui.switch_at_req_stop->setChecked(prefs.switch_at_req_stop);
 	ui.min_switch_duration->setValue(PlannerShared::min_switch_duration());
@@ -401,6 +402,7 @@ PlannerSettingsWidget::PlannerSettingsWidget(QWidget *parent) : QWidget(parent, 
 	connect(ui.backgasBreaks, &QAbstractButton::toggled, this, &PlannerSettingsWidget::setBackgasBreaks);
 	connect(ui.bailout, &QAbstractButton::toggled, &PlannerShared::set_dobailout);
 	connect(ui.o2narcotic, &QAbstractButton::toggled, &PlannerShared::set_o2narcotic);
+	connect(ui.auto_ccr_setpoint_deco, &QAbstractButton::toggled, &PlannerShared::set_auto_ccr_setpoint_deco);
 	connect(ui.switch_at_req_stop, &QAbstractButton::toggled, plannerModel, &DivePlannerPointsModel::setSwitchAtReqStop);
 	connect(ui.min_switch_duration, QOverload<int>::of(&QSpinBox::valueChanged), &PlannerShared::set_min_switch_duration);
 	connect(ui.surface_segment, QOverload<int>::of(&QSpinBox::valueChanged), &PlannerShared::set_surface_segment);

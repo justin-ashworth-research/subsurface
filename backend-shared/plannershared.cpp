@@ -129,6 +129,17 @@ void PlannerShared::set_o2narcotic(bool value)
 	DivePlannerPointsModel::instance()->cylindersModel()->emitDataChanged();
 }
 
+bool PlannerShared::auto_ccr_setpoint_deco()
+{
+	return qPrefDivePlanner::auto_ccr_setpoint_deco();
+}
+void PlannerShared::set_auto_ccr_setpoint_deco(bool value)
+{
+	qPrefDivePlanner::set_auto_ccr_setpoint_deco(value);
+	DivePlannerPointsModel::instance()->emitDataChanged();
+	DivePlannerPointsModel::instance()->cylindersModel()->emitDataChanged();
+}
+
 double PlannerShared::bottompo2()
 {
 	return (qPrefDivePlanner::bottompo2() / 1000.0);

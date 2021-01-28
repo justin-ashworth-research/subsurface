@@ -29,6 +29,7 @@ public:
 	static double decosac();
 	static double sacfactor();
 	static bool o2narcotic();
+	static bool auto_ccr_setpoint_deco();
 	static double bottompo2();
 	static double decopo2();
 	static int bestmixend();
@@ -48,6 +49,7 @@ public slots:
 	static void set_decosac(double value);
 	static void set_sacfactor(double value);
 	static void set_o2narcotic(bool value);
+	static void set_auto_ccr_setpoint_deco(bool value);
 	static void set_bottompo2(double value);
 	static void set_decopo2(double value);
 	static void set_bestmixend(int value);
