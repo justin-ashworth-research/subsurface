@@ -353,12 +353,13 @@ struct divedatapoint *create_dp(int time_incr, int depth, int cylinderid, int po
 }
 
 // auto CCR setpoint increases during decompression
-static void set_auto_deco_setpoints(struct diveplan *diveplan)
+static int set_auto_deco_setpoints(struct diveplan *diveplan)
 {
 	struct divedatapoint **dp = &diveplan->dp; // the array of divedatapoint
 	depth_t const d1 = {21000}; // depth_t is a struct with a sole member 'mm' <int>
 	depth_t const d2 = {6000};
 	int previous_depth = 1e9; // mind previous depth to avoid premature increase during ascents
+	int last_setpoint;
 	while (*dp){
 //		printf("time %i, depth %i; setpoint %i",(*dp)->time,(*dp)->depth.mm,(*dp)->setpoint);
 		if((*dp)->divemode == CCR){
@@ -372,8 +373,10 @@ static void set_auto_deco_setpoints(struct diveplan *diveplan)
 		}
 //		printf("\n");
 		previous_depth = (*dp)->depth.mm;
+		last_setpoint = (*dp)->setpoint;
 		dp = &(*dp)->next;
 	}
+	return last_setpoint;
 }
 
 static void add_to_end_of_diveplan(struct diveplan *diveplan, struct divedatapoint *dp)
@@ -397,7 +400,6 @@ struct divedatapoint *plan_add_segment(struct diveplan *diveplan, int duration, 
 	struct divedatapoint *dp = create_dp(duration, depth, cylinderid, divemode == CCR ? po2 : 0);
 	dp->entered = entered;
 	dp->divemode = divemode;
-//	if(divemode == CCR) dp->setpoint = po2;
 	add_to_end_of_diveplan(diveplan, dp);
 	return dp;
 }
@@ -871,6 +873,9 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 
 	//CVA
 	do {
+
+		if(divemode == CCR) po2 = set_auto_deco_setpoints(diveplan);
+
 		decostopcounter = 0;
 		is_final_plan = (decoMode() == BUEHLMANN) || (previous_deco_time - ds->deco_time < 10);  // CVA time converges
 		if (ds->deco_time != 10000000)
@@ -907,6 +912,9 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 		}
 		reset_regression(ds);
 		while (1) {
+
+			if(divemode == CCR) po2 = set_auto_deco_setpoints(diveplan);
+
 			/* We will break out when we hit the surface */
 			do {
 				/* Ascend to next stop depth */
@@ -920,6 +928,8 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 				}
 				if (depth - deltad < stoplevels[stopidx])
 					deltad = depth - stoplevels[stopidx];
+
+				if(divemode == CCR) po2 = set_auto_deco_setpoints(diveplan);
 
 				add_segment(ds, depth_to_bar(depth, dive),
 								get_cylinder(dive, current_cylinder)->gasmix,
@@ -979,6 +989,9 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 
 			/* Save the current state and try to ascend to the next stopdepth */
 			while (1) {
+
+				if(divemode == CCR) po2 = set_auto_deco_setpoints(diveplan);
+
 				/* Check if ascending to next stop is clear, go back and wait if we hit the ceiling on the way */
 				if (trial_ascent(ds, 0, depth, stoplevels[stopidx], avg_depth, bottom_time,
 						get_cylinder(dive, current_cylinder)->gasmix, po2, diveplan->surface_pressure / 1000.0, dive, divemode)) {
@@ -1113,10 +1126,6 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 		current_cylinder = dive->cylinders.nr;
 		plan_add_segment(diveplan, prefs.surface_segment, 0, current_cylinder, 0, false, OC);
 	}
-
-	// auto CCR setpoint increases during decompression
-	// update applicable diveplan divedatapoint.setpoint(s)
-	if(divemode == CCR && !prefs.dobailout) set_auto_deco_setpoints(diveplan);
 
 	create_dive_from_plan(diveplan, dive, is_planner);
 	add_plan_to_notes(diveplan, dive, show_disclaimer, error);
