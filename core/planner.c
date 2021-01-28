@@ -364,13 +364,14 @@ static int set_auto_deco_setpoints(struct diveplan *diveplan, int po2)
 	while (*dp){
 //		printf("time %i, depth %i; setpoint %i",(*dp)->time,(*dp)->depth.mm,(*dp)->setpoint);
 		if((*dp)->divemode == CCR){
-			if((*dp)->depth.mm <= d1.mm && previous_depth <= d1.mm){
-				(*dp)->setpoint = 1400;
-			}
 			if((*dp)->depth.mm <= d2.mm && previous_depth <= d2.mm){
 				(*dp)->setpoint = 1600;
-			}
 //			printf(" ** CCR auto setpoint %i",(*dp)->setpoint);
+			}
+			else if((*dp)->depth.mm <= d1.mm && previous_depth <= d1.mm){
+				(*dp)->setpoint = 1400;
+//			printf(" ** CCR auto setpoint %i",(*dp)->setpoint);
+			}
 		}
 //		printf("\n");
 		previous_depth = (*dp)->depth.mm;
@@ -757,7 +758,7 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 	}
 
 #if DEBUG_PLAN & 4
-	printf("gas %s\n", gasname(&gas));
+	printf("gas %s\n", gasname(gas));
 	printf("depth %5.2lfm \n", depth / 1000.0);
 	printf("current_cylinder %i\n", current_cylinder);
 #endif
@@ -875,8 +876,6 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 	//CVA
 	do {
 
-		if(divemode == CCR) po2 = set_auto_deco_setpoints(diveplan, po2);
-
 		decostopcounter = 0;
 		is_final_plan = (decoMode() == BUEHLMANN) || (previous_deco_time - ds->deco_time < 10);  // CVA time converges
 		if (ds->deco_time != 10000000)
@@ -929,8 +928,6 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 				}
 				if (depth - deltad < stoplevels[stopidx])
 					deltad = depth - stoplevels[stopidx];
-
-				if(divemode == CCR) po2 = set_auto_deco_setpoints(diveplan, po2);
 
 				add_segment(ds, depth_to_bar(depth, dive),
 								get_cylinder(dive, current_cylinder)->gasmix,
@@ -990,8 +987,6 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 
 			/* Save the current state and try to ascend to the next stopdepth */
 			while (1) {
-
-				if(divemode == CCR) po2 = set_auto_deco_setpoints(diveplan, po2);
 
 				/* Check if ascending to next stop is clear, go back and wait if we hit the ceiling on the way */
 				if (trial_ascent(ds, 0, depth, stoplevels[stopidx], avg_depth, bottom_time,
