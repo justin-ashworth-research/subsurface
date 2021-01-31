@@ -359,24 +359,20 @@ struct divedatapoint *create_dp(int time_incr, int depth, int cylinderid, int po
 static int set_auto_deco_setpoints(struct diveplan *diveplan, int po2)
 {
 	if(!prefs.auto_ccr_setpoint_deco) return po2;
-	struct divedatapoint **dp = &diveplan->dp; // the array of divedatapoint
+	struct divedatapoint **dp = &diveplan->dp;
 	int const d1 = 21000;
 	int const d2 = 6000;
-	int previous_depth = 1e9; // mind previous depth to avoid premature increase during ascents
+	int previous_depth = 1e9;
 	int last_setpoint;
 	while (*dp){
-//		printf("time %i, depth %i; setpoint %i",(*dp)->time,(*dp)->depth.mm,(*dp)->setpoint);
 		if((*dp)->divemode == CCR){
 			if((*dp)->depth.mm <= d2 && previous_depth <= d2){
-				(*dp)->setpoint = 1600;
-//			printf(" ** CCR auto setpoint %i",(*dp)->setpoint);
+				(*dp)->setpoint = (int) (((double) (*dp)->depth.mm + 10000) / 10);
 			}
 			else if((*dp)->depth.mm <= d1 && previous_depth <= d1){
 				(*dp)->setpoint = 1400;
-//			printf(" ** CCR auto setpoint %i",(*dp)->setpoint);
 			}
 		}
-//		printf("\n");
 		previous_depth = (*dp)->depth.mm;
 		last_setpoint = (*dp)->setpoint;
 		dp = &(*dp)->next;
