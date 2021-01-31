@@ -157,7 +157,7 @@ static double calculate_cns_dive(const struct dive *dive)
 		t = sample->time.seconds - psample->time.seconds;
 		// if dive computer has o2 sensor(s) (CCR & PSCR),
 		// then use data from the first o2 sensor
-		if (dc->divemode == CCR && psample->o2sensor[0].mbar && sample->o2sensor[0].mbar) {
+		if (psample->o2sensor[0].mbar && sample->o2sensor[0].mbar) {
 			po2i = psample->o2sensor[0].mbar;
 			po2f = sample->o2sensor[0].mbar;
 		}
