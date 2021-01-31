@@ -107,15 +107,14 @@ static int calculate_otu(const struct dive *dive)
 		if (sample->o2sensor[0].mbar) {			// if dive computer has o2 sensor(s) (CCR & PSCR) ..
 			po2i = psample->o2sensor[0].mbar;
 			po2f = sample->o2sensor[0].mbar;	// ... use data from the first o2 sensor
-		} else {
-			if (dc->divemode == CCR) {
-				po2i = psample->setpoint.mbar;		// if CCR has no o2 sensors then use setpoint
-				po2f = sample->setpoint.mbar;
-			} else {						// For OC and rebreather without o2 sensor/setpoint
-				int o2 = active_o2(dive, dc, psample->time);	// 	... calculate po2 from depth and FiO2.
-				po2i = lrint(o2 * depth_to_atm(psample->depth.mm, dive));	// (initial) po2 at start of segment
-				po2f = lrint(o2 * depth_to_atm(sample->depth.mm, dive));	// (final) po2 at end of segment
-			}
+		}
+		else if (dc->divemode == CCR && psample->setpoint.mbar && sample->setpoint.mbar) {
+			po2i = psample->setpoint.mbar;		// if CCR has no o2 sensors then use setpoint
+			po2f = sample->setpoint.mbar;
+		} else {						// For OC and rebreather without o2 sensor/setpoint
+			int o2 = active_o2(dive, dc, psample->time);	// 	... calculate po2 from depth and FiO2.
+			po2i = lrint(o2 * depth_to_atm(psample->depth.mm, dive));	// (initial) po2 at start of segment
+			po2f = lrint(o2 * depth_to_atm(sample->depth.mm, dive));	// (final) po2 at end of segment
 		}
 		if ((po2i > 500) || (po2f > 500)) {			// If PO2 in segment is above 500 mbar then calculate otu
 			if (po2i <= 500) {				// For descent segment with po2i <= 500 mbar ..
@@ -146,46 +145,48 @@ static int calculate_otu(const struct dive *dive)
    to the end of the segment, assuming a constant rate of change in po2 (i.e. depth) with time. */
 static double calculate_cns_dive(const struct dive *dive)
 {
-	int n;
 	const struct divecomputer *dc = &dive->dc;
 	double cns = 0.0;
 	double rate;
 	/* Calculate the CNS for each sample in this dive and sum them */
-	for (n = 1; n < dc->samples; n++) {
+	for (int n = 1; n < dc->samples; n++) {
 		int t;
 		int po2i, po2f;
-		bool trueo2 = false;
 		struct sample *sample = dc->sample + n;
 		struct sample *psample = sample - 1;
 		t = sample->time.seconds - psample->time.seconds;
-		if (sample->o2sensor[0].mbar) {			// if dive computer has o2 sensor(s) (CCR & PSCR)
+		// if dive computer has o2 sensor(s) (CCR & PSCR),
+		// then use data from the first o2 sensor
+		if (dc->divemode == CCR && psample->o2sensor[0].mbar && sample->o2sensor[0].mbar) {
 			po2i = psample->o2sensor[0].mbar;
-			po2f = sample->o2sensor[0].mbar;	// then use data from the first o2 sensor
-			trueo2 = true;
+			po2f = sample->o2sensor[0].mbar;
 		}
-		// use CCR setpoints, if available/non-zero
-		if (!trueo2 && (psample->setpoint.mbar > 0 || sample->setpoint.mbar > 0)) {
-			po2i = psample->setpoint.mbar;		// if CCR has no o2 sensors then use setpoint
+		// if CCR has no o2 sensors then use setpoint
+		else if (dc->divemode == CCR && psample->setpoint.mbar && sample->setpoint.mbar) {
+			po2i = psample->setpoint.mbar;
 			po2f = sample->setpoint.mbar;
-			trueo2 = true;
 		}
+		// For OC and rebreather without o2 sensor
 		// neither sensor po2 nor CCR setpoints available--calculate from active gas
-		if (!trueo2) {
-			int o2 = active_o2(dive, dc, psample->time);			// For OC and rebreather without o2 sensor:
-			po2i = lrint(o2 * depth_to_atm(psample->depth.mm, dive));	// (initial) po2 at start of segment
-			po2f = lrint(o2 * depth_to_atm(sample->depth.mm, dive));	// (final) po2 at end of segment
+		else {
+			int o2 = active_o2(dive, dc, psample->time);
+			// (initial) po2 at start of segment
+			po2i = lrint(o2 * depth_to_atm(psample->depth.mm, dive));
+			// (final) po2 at end of segment
+			po2f = lrint(o2 * depth_to_atm(sample->depth.mm, dive));
 		}
-		po2i = (po2i + po2f) / 2;	// po2i now holds the mean po2 of initial and final po2 values of segment.
+		// po2avg holds the mean po2 of initial and final po2 values of segment.
+		int po2avg = (po2i + po2f) / 2;
 		/* Don't increase CNS when po2 below 500 matm */
-		if (po2i <= 500)
+		if (po2avg <= 500)
 			continue;
 
 		// This formula is the result of fitting two lines to the Log of the NOAA CNS table
-		rate = po2i <= 1500 ? exp(-11.7853 + 0.00193873 * po2i) : exp(-23.6349 + 0.00980829 * po2i);
+		rate = po2avg <= 1500 ? exp(-11.7853 + 0.00193873 * po2avg) : exp(-23.6349 + 0.00980829 * po2avg);
 		cns += (double) t * rate * 100.0;
 
 #if DECO_CALC_DEBUG & 2
-		printf("\tstep %i-%i time %f-%f depth %i-%i po2 %i-%i cns %f\n", n-1, n, psample->time.seconds/60.0, sample->time.seconds/60.0, psample->depth.mm, sample->depth.mm, po2i, po2f, cns);
+		printf("\tstep %i-%i time %f-%f depth %i-%i po2 %i-%i po2avg %i cns %f\n", n-1, n, psample->time.seconds/60.0, sample->time.seconds/60.0, psample->depth.mm, sample->depth.mm, po2i, po2f, po2avg, cns);
 #endif
 	}
 	return cns;
