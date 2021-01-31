@@ -163,11 +163,13 @@ static double calculate_cns_dive(const struct dive *dive)
 			po2f = sample->o2sensor[0].mbar;	// then use data from the first o2 sensor
 			trueo2 = true;
 		}
-		if ((dc->divemode == CCR) && (!trueo2)) {
+		// use CCR setpoints, if available/non-zero
+		if (!trueo2 && (psample->setpoint.mbar > 0 || sample->setpoint.mbar > 0)) {
 			po2i = psample->setpoint.mbar;		// if CCR has no o2 sensors then use setpoint
 			po2f = sample->setpoint.mbar;
 			trueo2 = true;
 		}
+		// neither sensor po2 nor CCR setpoints available--calculate from active gas
 		if (!trueo2) {
 			int o2 = active_o2(dive, dc, psample->time);			// For OC and rebreather without o2 sensor:
 			po2i = lrint(o2 * depth_to_atm(psample->depth.mm, dive));	// (initial) po2 at start of segment
@@ -181,6 +183,10 @@ static double calculate_cns_dive(const struct dive *dive)
 		// This formula is the result of fitting two lines to the Log of the NOAA CNS table
 		rate = po2i <= 1500 ? exp(-11.7853 + 0.00193873 * po2i) : exp(-23.6349 + 0.00980829 * po2i);
 		cns += (double) t * rate * 100.0;
+
+#if DECO_CALC_DEBUG & 2
+		printf("\tstep %i-%i time %f-%f depth %i-%i po2 %i-%i cns %f\n", n-1, n, psample->time.seconds/60.0, sample->time.seconds/60.0, psample->depth.mm, sample->depth.mm, po2i, po2f, cns);
+#endif
 	}
 	return cns;
 }

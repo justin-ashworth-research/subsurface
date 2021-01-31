@@ -58,7 +58,7 @@ void dump_plan(struct diveplan *diveplan)
 	       diveplan->surface_pressure);
 	dp = diveplan->dp;
 	while (dp) {
-		printf("\t%3u:%02u: %6dmm cylid: %2d setpoint: %d\n", FRACTION(dp->time, 60), dp->depth, dp->cylinderid, dp->setpoint);
+		printf("\t%3u:%02u: %6dmm cylid: %2d setpoint: %d\n", FRACTION(dp->time, 60), dp->depth.mm, dp->cylinderid, dp->setpoint);
 		dp = dp->next;
 	}
 }
@@ -314,12 +314,15 @@ static void create_dive_from_plan(struct diveplan *diveplan, struct dive *dive, 
 				sample->pressure[0].mbar = cyl->end.mbar;
 		}
 		finish_sample(dc);
+#if DEBUG_PLAN & 16
+		printf("create_dive_from_plan: sample time %f depth %i po2 %i\n", sample->time.seconds/60.0, sample->depth.mm, sample->setpoint.mbar);
+#endif
 		dp = dp->next;
 	}
 	dive->dc.last_manual_time.seconds = last_manual_point;
 
 #if DEBUG_PLAN & 32
-	save_dive(stdout, dive);
+	save_dive(stdout, dive, false);
 #endif
 	return;
 }
@@ -357,18 +360,18 @@ static int set_auto_deco_setpoints(struct diveplan *diveplan, int po2)
 {
 	if(!prefs.auto_ccr_setpoint_deco) return po2;
 	struct divedatapoint **dp = &diveplan->dp; // the array of divedatapoint
-	depth_t const d1 = {21000}; // depth_t is a struct with a sole member 'mm' <int>
-	depth_t const d2 = {6000};
+	int const d1 = 21000;
+	int const d2 = 6000;
 	int previous_depth = 1e9; // mind previous depth to avoid premature increase during ascents
 	int last_setpoint;
 	while (*dp){
 //		printf("time %i, depth %i; setpoint %i",(*dp)->time,(*dp)->depth.mm,(*dp)->setpoint);
 		if((*dp)->divemode == CCR){
-			if((*dp)->depth.mm <= d2.mm && previous_depth <= d2.mm){
+			if((*dp)->depth.mm <= d2 && previous_depth <= d2){
 				(*dp)->setpoint = 1600;
 //			printf(" ** CCR auto setpoint %i",(*dp)->setpoint);
 			}
-			else if((*dp)->depth.mm <= d1.mm && previous_depth <= d1.mm){
+			else if((*dp)->depth.mm <= d1 && previous_depth <= d1){
 				(*dp)->setpoint = 1400;
 //			printf(" ** CCR auto setpoint %i",(*dp)->setpoint);
 			}
@@ -378,6 +381,7 @@ static int set_auto_deco_setpoints(struct diveplan *diveplan, int po2)
 		last_setpoint = (*dp)->setpoint;
 		dp = &(*dp)->next;
 	}
+
 	return last_setpoint;
 }
 
@@ -451,7 +455,7 @@ static struct gaschanges *analyze_gaslist(struct diveplan *diveplan, struct dive
 	for (nr = 0; nr < *gaschangenr; nr++) {
 		int idx = gaschanges[nr].gasidx;
 		printf("gaschange nr %d: @ %5.2lfm gasidx %d (%s)\n", nr, gaschanges[nr].depth / 1000.0,
-		       idx, gasname(&get_cylinder(&dive, idx)->gasmix));
+		       idx, gasname(get_cylinder(dive, idx)->gasmix));
 	}
 #endif
 	return gaschanges;
@@ -847,8 +851,9 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 		gas = get_cylinder(dive, current_cylinder)->gasmix;
 
 #if DEBUG_PLAN & 16
+		if(gaschanges)
 		printf("switch to gas %d (%d/%d) @ %5.2lfm\n", best_first_ascend_cylinder,
-		       (get_o2(&gas) + 5) / 10, (get_he(&gas) + 5) / 10, gaschanges[best_first_ascend_cylinder].depth / 1000.0);
+		       (get_o2(gas) + 5) / 10, (get_he(gas) + 5) / 10, gaschanges[best_first_ascend_cylinder].depth / 1000.0);
 #endif
 	}
 
@@ -964,7 +969,7 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 						gas = get_cylinder(dive, current_cylinder)->gasmix;
 #if DEBUG_PLAN & 16
 						printf("switch to gas %d (%d/%d) @ %5.2lfm\n", gaschanges[gi].gasidx,
-							(get_o2(&gas) + 5) / 10, (get_he(&gas) + 5) / 10, gaschanges[gi].depth / 1000.0);
+							(get_o2(gas) + 5) / 10, (get_he(gas) + 5) / 10, gaschanges[gi].depth / 1000.0);
 #endif
 						/* Stop for the minimum duration to switch gas unless we switch to o2 */
 						if (!last_segment_min_switch && get_o2(get_cylinder(dive, current_cylinder)->gasmix) != 1000) {
@@ -1019,7 +1024,7 @@ bool plan(struct deco_state *ds, struct diveplan *diveplan, struct dive *dive, i
 					gas = get_cylinder(dive, current_cylinder)->gasmix;
 #if DEBUG_PLAN & 16
 					printf("switch to gas %d (%d/%d) @ %5.2lfm\n", gaschanges[gi + 1].gasidx,
-						(get_o2(&gas) + 5) / 10, (get_he(&gas) + 5) / 10, gaschanges[gi + 1].depth / 1000.0);
+						(get_o2(gas) + 5) / 10, (get_he(gas) + 5) / 10, gaschanges[gi + 1].depth / 1000.0);
 #endif
 					/* Stop for the minimum duration to switch gas unless we switch to o2 */
 					if (!last_segment_min_switch && get_o2(get_cylinder(dive, current_cylinder)->gasmix) != 1000) {
